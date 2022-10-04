@@ -43,6 +43,7 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
           ))
       }
     }
+    //odf.show()
     odf
   }
 }
