@@ -1,6 +1,6 @@
 package anovos.data.transformer
 
-import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
+import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, StringIndexerModel}
 import org.apache.spark.ml.linalg.SparseVector
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
@@ -11,15 +11,40 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
   import org.apache.spark.sql.functions._
   import scala.collection.JavaConverters._
 
-  def apply(methodType : String, listOfColumns : util.ArrayList[String]): DataFrame = {
+  def apply(methodType : String = "label_encoding", indexOrder: String = "frequencyDesc",
+            listOfColumns : util.ArrayList[String], preExistingModel : Boolean = false ,
+            modelPath : String = "NA", outputMode : String = "replace", printImpact : Boolean = false): DataFrame = {
+
     val listOfCols = listOfColumns.asScala.toArray
     val listOfColsIndex = listOfCols.map(m => m+"_index")
     val listOfColsVec = listOfCols.map(m => m+"_vec")
 
-    val odfIndexed = new StringIndexer().setHandleInvalid("keep").setInputCols(listOfCols).setOutputCols(listOfColsIndex).fit(df).transform(df)
+    var indexerModel:StringIndexerModel = null
+    if(preExistingModel){
+      indexerModel = StringIndexerModel.load(modelPath + "/cat_to_num_unsupervised/indexer")
+    }else{
+      indexerModel = new StringIndexer().setStringOrderType(indexOrder).setHandleInvalid("keep")
+        .setInputCols(listOfCols).setOutputCols(listOfColsIndex).fit(df)
+
+      if(!"NA".equalsIgnoreCase(modelPath)) {
+        indexerModel.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/indexer")
+      }
+    }
+
+    val odfIndexed = indexerModel.transform(df)
+
     var odf = odfIndexed
     if("onehot_encoding".equalsIgnoreCase(methodType)) {
-      val oneHotEncoder = new OneHotEncoder().setHandleInvalid("keep").setInputCols(listOfColsIndex).setOutputCols(listOfColsVec)
+      var oneHotEncoder:OneHotEncoder = null
+      if(preExistingModel){
+        oneHotEncoder = OneHotEncoder.load(modelPath + "/cat_to_num_unsupervised/encoder")
+      }else{
+        oneHotEncoder = new OneHotEncoder().setHandleInvalid("keep").setInputCols(listOfColsIndex).setOutputCols(listOfColsVec)
+        if(!"NA".equalsIgnoreCase(modelPath)) {
+          oneHotEncoder.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/encoder")
+        }
+      }
+
       odf = oneHotEncoder.fit(odfIndexed).transform(odfIndexed)
 
       val convertVectorToArr: Any => Array[Int] = _.asInstanceOf[SparseVector].toArray.map(_.toInt)

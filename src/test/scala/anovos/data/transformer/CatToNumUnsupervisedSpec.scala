@@ -13,6 +13,8 @@ class CatToNumUnsupervisedSpec extends FunSuite with BeforeAndAfter {
 
     val inputPath = "./data/test_dataset/part-00001-3eb0f7bb-05c2-46ec-8913-23ba231d2734-c000.snappy.parquet"
     val outputPath = "./data/output/"
+    val modelPath = ""
+    val indexOrder = "frequencyDesc"
 
     var methodType = "label_encoding"
 
