@@ -3,8 +3,10 @@ package anovos.data.transformer
 import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, StringIndexerModel}
 import org.apache.spark.ml.linalg.SparseVector
 import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.types.IntegerType
 
 import java.util
+import scala.collection.mutable.ListBuffer
 
 class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
   import sqlContext.implicits._
@@ -12,8 +14,9 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
   import scala.collection.JavaConverters._
 
   def apply(methodType : String = "label_encoding", indexOrder: String = "frequencyDesc",
-            listOfColumns : util.ArrayList[String], preExistingModel : Boolean = false ,
-            modelPath : String = "NA", outputMode : String = "replace", printImpact : Boolean = false): DataFrame = {
+            listOfColumns : util.ArrayList[String], skipColumns : util.ArrayList[String] = null,
+            preExistingModel : Boolean = false , modelPath : String = "NA",
+            outputMode : String = "replace", printImpact : Boolean = false): DataFrame = {
 
     val listOfCols = listOfColumns.asScala.toArray
     val listOfColsIndex = listOfCols.map(m => m+"_index")
@@ -33,6 +36,7 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
 
     val odfIndexed = indexerModel.transform(df)
 
+    val newColumnsList = ListBuffer[String]()
     var odf = odfIndexed
     if("onehot_encoding".equalsIgnoreCase(methodType)) {
       var oneHotEncoder:OneHotEncoder = null
@@ -50,22 +54,64 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
       val convertVectorToArr: Any => Array[Int] = _.asInstanceOf[SparseVector].toArray.map(_.toInt)
       val vectorToArrUdf = udf(convertVectorToArr)
 
-      odf = odf.drop(listOfColsIndex.toSeq: _*)
       val sample_row = odf.take(1)
       listOfCols.foreach(colName => {
         val uniqCats = sample_row(0).getAs[SparseVector](colName + "_vec").size
+        for( i <- 0 to uniqCats-1){
+          newColumnsList.append(colName + "-" + i)
+        }
         odf = odf.select(
           odf.col("*") +: (0 until uniqCats).map(i => vectorToArrUdf(col(colName + "_vec"))(i).alias(s"$colName-$i")): _*
         )
+        if("replace".equalsIgnoreCase(outputMode)){
+          odf = odf.drop(colName, colName + "_vec", colName + "_index")
+        }else{
+          odf = odf.drop(colName + "_vec", colName + "_index")
+        }
       })
-      odf = odf.drop(listOfColsVec.toSeq: _*)
     }else{
       for (i <- listOfCols){
         odf = odf.withColumn(
           i + "_index",
-          when(col(i).isNull, col(i)).otherwise(
-            col(i + "_index").cast("Integer")
+          when(col(i).isNull, -1).otherwise(
+            col(i + "_index").cast(IntegerType)
           ))
+      }
+      if("replace".equalsIgnoreCase(outputMode)){
+        for (i <- listOfCols){
+          odf = odf.drop(i)
+            .withColumnRenamed(i+"_index", i)
+        }
+        odf = odf.select(df.columns.map(m=>col(m)):_*)
+      }
+    }
+    var newColumns = newColumnsList.toList.toArray
+    if(printImpact){
+      if("onehot_encoding".equalsIgnoreCase(methodType)){
+        println("Before")
+        df.select(listOfCols.map(m=>col(m)):_*).printSchema()
+        println("After")
+        if("append".equalsIgnoreCase(outputMode)){
+          val allCols = Array.concat(listOfCols, newColumns)
+          odf.select(allCols.map(m=>col(m)):_*).printSchema()
+        }else{
+          odf.select(newColumns.map(m=>col(m)):_*).printSchema()
+        }
+      }else{
+        var newCols = Array[String]()
+        if("append".equalsIgnoreCase(outputMode)){
+          for(column <- listOfCols){newColumnsList.append(column + "_index")}
+          newCols = newColumnsList.toList.toArray
+        }else{
+          newCols = listOfCols
+        }
+        println("Before")
+        df.select(listOfCols.map(m=>col(m)):_*).summary("count", "min", "max").show(3, false)
+        println("After")
+        odf.select(newCols.map(m=>col(m)):_*).summary("count", "min", "max").show(3, false)
+      }
+      if(skipColumns != null){
+        println("Columns dropped from encoding due to high cardinality: "+ skipColumns.asScala.toArray.mkString(","))
       }
     }
     //odf.show()
