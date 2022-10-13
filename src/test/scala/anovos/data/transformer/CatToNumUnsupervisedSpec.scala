@@ -26,7 +26,7 @@ class CatToNumUnsupervisedSpec extends FunSuite with BeforeAndAfter {
     val catToNumUnsupervisedObj = new CatToNumUnsupervised(spark.sqlContext, df)
 
     val odf = catToNumUnsupervisedObj.apply(methodType = methodType, indexOrder = indexOrder,
-      listOfColumns = listOfColumns, preExistingModel = false, modelPath = modelPath, outputMode = "replace", printImpact = true)
+      listOfColumns = listOfColumns, preExistingModel = false, modelPath = modelPath, outputMode = "append", printImpact = true)
 
     odf.show()
     odf.write.option("header",true).mode(SaveMode.Overwrite).csv(outputPath+"label_encoding")

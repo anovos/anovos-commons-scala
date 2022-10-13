@@ -1,6 +1,7 @@
 package anovos.data.transformer
 
-import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, StringIndexerModel}
+import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
+import org.apache.spark.ml.feature.{OneHotEncoderEstimator => OneHotEncoder}
 import org.apache.spark.ml.linalg.SparseVector
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.types.IntegerType
@@ -22,19 +23,24 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
     val listOfColsIndex = listOfCols.map(m => m+"_index")
     val listOfColsVec = listOfCols.map(m => m+"_vec")
 
+    var odfIndexed = df
     var indexerModel:StringIndexerModel = null
-    if(preExistingModel){
-      indexerModel = StringIndexerModel.load(modelPath + "/cat_to_num_unsupervised/indexer")
-    }else{
-      indexerModel = new StringIndexer().setStringOrderType(indexOrder).setHandleInvalid("keep")
-        .setInputCols(listOfCols).setOutputCols(listOfColsIndex).fit(df)
+    var stringIndexer = new StringIndexer()
+    for (i <- listOfCols) {
+      if (preExistingModel) {
+        indexerModel = StringIndexerModel.load(modelPath + "/cat_to_num_unsupervised/indexer-model" + i)
+      } else {
+        stringIndexer = new StringIndexer().setStringOrderType(indexOrder).setHandleInvalid("keep")
+          .setInputCol(i).setOutputCol(i + "_index")
 
-      if(!"NA".equalsIgnoreCase(modelPath)) {
-        indexerModel.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/indexer")
+        indexerModel = stringIndexer.fit(df.select(i))
+
+        if (!"NA".equalsIgnoreCase(modelPath)) {
+          indexerModel.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/indexer-model" + i)
+        }
       }
+      odfIndexed = indexerModel.transform(odfIndexed)
     }
-
-    val odfIndexed = indexerModel.transform(df)
 
     val newColumnsList = ListBuffer[String]()
     var odf = odfIndexed
