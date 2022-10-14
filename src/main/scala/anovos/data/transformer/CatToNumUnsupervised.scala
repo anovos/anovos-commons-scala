@@ -28,7 +28,7 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
     var stringIndexer = new StringIndexer()
     for (i <- listOfCols) {
       if (preExistingModel) {
-        indexerModel = StringIndexerModel.load(modelPath + "/cat_to_num_unsupervised/indexer-model" + i)
+        indexerModel = StringIndexerModel.load(modelPath + "/cat_to_num_unsupervised/indexer-model-" + i)
       } else {
         stringIndexer = new StringIndexer().setStringOrderType(indexOrder).setHandleInvalid("keep")
           .setInputCol(i).setOutputCol(i + "_index")
@@ -36,7 +36,7 @@ class CatToNumUnsupervised(sqlContext: SQLContext, df: DataFrame) {
         indexerModel = stringIndexer.fit(df.select(i))
 
         if (!"NA".equalsIgnoreCase(modelPath)) {
-          indexerModel.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/indexer-model" + i)
+          indexerModel.write.overwrite.save(modelPath + "/cat_to_num_unsupervised/indexer-model-" + i)
         }
       }
       odfIndexed = indexerModel.transform(odfIndexed)
