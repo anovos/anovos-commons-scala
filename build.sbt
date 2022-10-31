@@ -1,6 +1,12 @@
-ThisBuild / version := "spark-2.4.4_scala-2.11.12"
+organization := "anovos"
+name := "anovos-commons-scala"
 
-ThisBuild / scalaVersion := "2.11.12"
+githubOwner := "anovos"
+githubRepository := "anovos-commons-scala"
+githubTokenSource := TokenSource.GitConfig("github.token")
+
+version := "spark-2.4.4_scala-2.11.12"
+scalaVersion := "2.11.12"
 
 val sparkVersion = "2.4.4"
 
@@ -20,3 +26,6 @@ assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first
 }
+
+publishConfiguration := publishConfiguration.value.withOverwrite(true)
+publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true)
