@@ -5,10 +5,10 @@ version := "2.12.3"
 scalaVersion := "2.12.3"
 val sparkVersion = "3.0.0"
 
-publishTo := Some("MW Nexus" at "https://maven.wordsterbeta.com/content/repositories/mwrepo/")
-resolvers += ("MW Nexus" at "https://maven.wordsterbeta.com/content/repositories/mwrepo/").withAllowInsecureProtocol(true)
-credentials += Credentials("MW Nexus", "maven.wordsterbeta.com", "mw-nexus", "Wordster2009")
-
+publishTo := Some("Sonatype Snapshots Nexus" at "https://oss.sonatype.org/content/repositories/snapshots")
+resolvers +=
+  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers += Resolver.mavenCentral
 
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
@@ -26,8 +26,3 @@ assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first
 }
-
-publishConfiguration := publishConfiguration.value.withOverwrite(true)
-publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true)
-
-releaseIgnoreUntrackedFiles := true
